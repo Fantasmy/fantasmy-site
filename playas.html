@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mis Playas</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Traductor IA de Google -->
+    <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+    <script type="text/javascript">
+        function googleTranslateElementInit() {
+            new google.translate.TranslateElement({pageLanguage: 'es', layout: google.translate.TranslateElement.InlineLayout.SIMPLE}, 'google_translate_element');
+        }
+    </script>
+</head>
+<body>
+    <header>
+        <a href="index.html" class="brand">Olas & Calas</a>
+        <nav>
+            <ul>
+                <li>
+                    <div class="dropdown">
+                        <button class="dropbtn">Secciones ▼</button>
+                        <div class="dropdown-content">
+                            <a href="index.html">Verano</a>
+                            <a href="playas.html">Playas</a>
+                        </div>
+                    </div>
+                </li>
+                <li><a href="sobre-mi.html">Sobre mí</a></li>
+                <li id="google_translate_element"></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main id="content">
+        <!-- El contenido dinámico se inyecta aquí -->
+    </main>
+
+    <!-- PapaParse para leer CSV desde Google Sheets -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSection('Playas');
+        });
+    </script>
+</body>
+</html>
