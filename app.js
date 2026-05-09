@@ -9,33 +9,6 @@ function getCsvUrl(sheetName) {
     return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
 }
 
-/**
- * Función mágica para convertir enlaces de visualización 
- * (como los de Google Drive) en enlaces de imagen directa.
- */
-function fixImageUrl(url) {
-    if (!url) return '';
-    url = url.trim();
-
-    // Lógica para Google Drive
-    if (url.includes('drive.google.com')) {
-        let fileId = '';
-        if (url.includes('/d/')) {
-            fileId = url.split('/d/')[1].split('/')[0];
-        } else if (url.includes('id=')) {
-            fileId = url.split('id=')[1].split('&')[0];
-        }
-        return fileId ? `https://lh3.googleusercontent.com/d/${fileId}` : url;
-    }
-
-    // Lógica para Dropbox
-    if (url.includes('dropbox.com')) {
-        return url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace('?dl=0', '');
-    }
-
-    return url;
-}
-
 // Parsear fechas en formato DD/MM/YYYY para ordenar
 function parseDate(dateStr) {
     if (!dateStr) return new Date(0);
@@ -88,16 +61,14 @@ function renderPosts(data, container) {
 
     sortedData.forEach((row, index) => {
         // Extraer valores con posible diferencia de idioma en cabeceras
-        const coverPhoto = fixImageUrl(row['Cover Photo'] || row['Foto Portada']);
+        const coverPhoto = row['Cover Photo'] || row['Foto Portada'];
         const date = row['Date'] || row['Fecha'];
         const title = row['Title'] || row['Titulo'];
         const description = row['Description'] || row['Descripcion'];
         
-        // Corregir URLs de imágenes
-
-        const photo1 = fixImageUrl(row['Photo 1'] || row['Foto 1']);
-        const photo2 = fixImageUrl(row['Photo 2'] || row['Foto 2']);
-        const photo3 = fixImageUrl(row['Photo 3'] || row['Foto 3']);
+        const photo1 = row['Photo 1'] || row['Foto 1'];
+        const photo2 = row['Photo 2'] || row['Foto 2'];
+        const photo3 = row['Photo 3'] || row['Foto 3'];
 
         const carouselPhotos = [photo1, photo2, photo3].filter(p => p && p.trim() !== '');
 
@@ -165,7 +136,7 @@ async function loadAboutMe(sheetName) {
             complete: function(results) {
                 if (results.data.length > 0) {
                     const data = results.data[0]; // Coger la primera línea
-                    const photo = fixImageUrl(data['Photo'] || data['Foto']);
+                    const photo = data['Photo'] || data['Foto'] || '';
                     const name = data['Name'] || data['Nombre'] || 'Mi Nombre';
                     const bio = data['Bio'] || data['Descripcion'] || '';
 
