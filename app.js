@@ -1,15 +1,63 @@
+// =========================================================
+// CONFIGURACIÓN
+// =========================================================
+const SHEET_ID = '1iBxpJ-TK5TH6T9Ji2tYq_vIlckSxy9h0Ykc1Wa1OJhk'; 
 
-// =========================================================
-// CONFIGURACIÓN: Reemplaza este ID con el ID de tu Google Sheet
-// =========================================================
-const SHEET_ID = '1iBxpJ-TK5TH6T9Ji2tYq_vIlckSxy9h0Ykc1Wa1OJhk'; // <--- ¡CAMBIA ESTO!
-// =========================================================
+/**
+ * Función mágica para convertir enlaces de visualización 
+ * (como los de Google Drive) en enlaces de imagen directa.
+ */
+function fixImageUrl(url) {
+    if (!url) return '';
+    url = url.trim();
 
-function getCsvUrl(sheetName) {
-    return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+    // Lógica para Google Drive
+    if (url.includes('drive.google.com')) {
+        let fileId = '';
+        if (url.includes('/d/')) {
+            fileId = url.split('/d/')[1].split('/')[0];
+        } else if (url.includes('id=')) {
+            fileId = url.split('id=')[1].split('&')[0];
+        }
+        return fileId ? `https://lh3.googleusercontent.com/d/${fileId}` : url;
+    }
+
+    // Lógica para Dropbox
+    if (url.includes('dropbox.com')) {
+        return url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace('?dl=0', '');
+    }
+
+    return url;
 }
 
-// Parsear fechas en formato DD/MM/YYYY para ordenar
+function getCsvUrl(sheetName) {
+    const baseUri = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+    // Proxy para evitar errores de CORS (crucial para GitHub y local)
+    return `https://api.allorigins.win/raw?url=${encodeURIComponent(baseUri)}`;
+}
+
+async function loadSection(sheetName) {
+    const container = document.getElementById('content');
+    container.innerHTML = '<div class="loader">Buscando tesoros en el mar... 🌊</div>';
+
+    try {
+        const response = await fetch(getCsvUrl(sheetName));
+        if (!response.ok) throw new Error('Error de red');
+        const csvText = await response.text();
+
+        Papa.parse(csvText, {
+            header: true,
+            skipEmptyLines: true,
+            complete: function(results) {
+                renderPosts(results.data, container);
+            }
+        });
+    } catch (error) {
+        console.error(error);
+        container.innerHTML = `<p style="text-align:center; padding: 2rem;">Error al conectar con los datos. <br> Revisa que el Sheet esté "Publicado en la web".</p>`;
+    }
+}
+
 function parseDate(dateStr) {
     if (!dateStr) return new Date(0);
     const parts = dateStr.split('/');
@@ -19,83 +67,58 @@ function parseDate(dateStr) {
     return new Date(dateStr);
 }
 
-async function loadSection(sheetName) {
-    const container = document.getElementById('content');
-    container.innerHTML = '<div class="loader">Cargando publicaciones... 🌊</div>';
-
-    try {
-        const response = await fetch(getCsvUrl(sheetName));
-        if (!response.ok) throw new Error('Network response was not ok');
-        const csvText = await response.text();
-
-        Papa.parse(csvText, {
-            header: true,
-            skipEmptyLines: true,
-            complete: function(results) {
-                renderPosts(results.data, container);
-            },
-            error: function(error) {
-                container.innerHTML = `<p style="color:red;">Error leyendo datos: ${error.message}</p>`;
-            }
-        });
-    } catch (error) {
-        container.innerHTML = `<p style="color:red;">Error de conexión. Asegúrate de que el Google Sheet esté compartido como "Cualquier persona con el enlace puede leer".</p>`;
-        console.error(error);
-    }
-}
-
 function renderPosts(data, container) {
     container.innerHTML = '';
     
-    if (data.length === 0) {
-        container.innerHTML = '<p>No hay publicaciones en esta sección todavía.</p>';
+    // Filtrar filas vacías (donde no hay título)
+    const validData = data.filter(row => row['Title'] || row['Titulo']);
+
+    if (validData.length === 0) {
+        container.innerHTML = '<p style="text-align:center;">No hay publicaciones en esta sección todavía. 🌴</p>';
         return;
     }
 
-    // Ordenar de más nuevo a más viejo
-    const sortedData = data.sort((a, b) => {
-        const dateA = parseDate(a['Date'] || a['Fecha']);
-        const dateB = parseDate(b['Date'] || b['Fecha']);
-        return dateB - dateA;
+    // Ordenar: Más reciente primero
+    validData.sort((a, b) => {
+        return parseDate(b['Date'] || b['Fecha']) - parseDate(a['Date'] || a['Fecha']);
     });
 
-    sortedData.forEach((row, index) => {
-        // Extraer valores con posible diferencia de idioma en cabeceras
-        const coverPhoto = row['Cover Photo'] || row['Foto Portada'];
-        const date = row['Date'] || row['Fecha'];
-        const title = row['Title'] || row['Titulo'];
-        const description = row['Description'] || row['Descripcion'];
+    validData.forEach((row, index) => {
+        const title = row['Title'] || row['Titulo'] || 'Sin título';
+        const description = row['Description'] || row['Descripcion'] || '';
+        const date = row['Date'] || row['Fecha'] || '';
         
-        const photo1 = row['Photo 1'] || row['Foto 1'];
-        const photo2 = row['Photo 2'] || row['Foto 2'];
-        const photo3 = row['Photo 3'] || row['Foto 3'];
+        // Corregir URLs de imágenes
+        const coverPhoto = fixImageUrl(row['Cover Photo'] || row['Foto Portada']);
+        const photo1 = fixImageUrl(row['Photo 1'] || row['Foto 1']);
+        const photo2 = fixImageUrl(row['Photo 2'] || row['Foto 2']);
+        const photo3 = fixImageUrl(row['Photo 3'] || row['Foto 3']);
 
-        const carouselPhotos = [photo1, photo2, photo3].filter(p => p && p.trim() !== '');
+        const carouselPhotos = [photo1, photo2, photo3].filter(p => p !== '');
 
         const article = document.createElement('article');
         article.className = 'post';
 
         let html = '';
         if (coverPhoto) {
-            html += `<div class="post-cover"><img src="${coverPhoto}" alt="${title}"></div>`;
+            html += `<div class="post-cover"><img src="${coverPhoto}" alt="${title}" onerror="this.src='https://via.placeholder.com/800x400?text=Imagen+no+encontrada'"></div>`;
         }
         
         html += `<div class="post-content">`;
         if (date) html += `<span class="post-date">${date}</span>`;
-        if (title) html += `<h2 class="post-title">${title}</h2>`;
-        if (description) html += `<p class="post-description">${description}</p>`;
+        html += `<h2 class="post-title">${title}</h2>`;
+        html += `<p class="post-description">${description}</p>`;
 
-        // Añadir Carrusel si hay fotos extra
         if (carouselPhotos.length > 0) {
-            const carouselId = `carousel-${index}`;
+            const cId = `carousel-${index}`;
             html += `
-            <div class="carousel-container" id="${carouselId}">
-                <div class="carousel-slides" style="transform: translateX(0%);">
-                    ${carouselPhotos.map(photo => `<div class="carousel-slide"><img src="${photo}" alt="Gallery photo"></div>`).join('')}
+            <div class="carousel-container" id="${cId}">
+                <div class="carousel-slides">
+                    ${carouselPhotos.map(p => `<div class="carousel-slide"><img src="${p}" onerror="this.style.display='none'"></div>`).join('')}
                 </div>
                 ${carouselPhotos.length > 1 ? `
-                    <button class="carousel-btn prev" onclick="moveSlide('${carouselId}', -1, ${carouselPhotos.length})">❮</button>
-                    <button class="carousel-btn next" onclick="moveSlide('${carouselId}', 1, ${carouselPhotos.length})">❯</button>
+                    <button class="carousel-btn prev" onclick="moveSlide('${cId}', -1, ${carouselPhotos.length})">❮</button>
+                    <button class="carousel-btn next" onclick="moveSlide('${cId}', 1, ${carouselPhotos.length})">❯</button>
                 ` : ''}
             </div>`;
         }
@@ -106,51 +129,37 @@ function renderPosts(data, container) {
     });
 }
 
-// Lógica de Carrusel
+// Lógica de movimiento del carrusel
 const carouselState = {};
-function moveSlide(carouselId, direction, totalSlides) {
-    if (!carouselState[carouselId]) {
-        carouselState[carouselId] = 0;
-    }
-    carouselState[carouselId] += direction;
-    
-    if (carouselState[carouselId] >= totalSlides) carouselState[carouselId] = 0;
-    if (carouselState[carouselId] < 0) carouselState[carouselId] = totalSlides - 1;
-
-    const slidesContainer = document.querySelector(`#${carouselId} .carousel-slides`);
-    slidesContainer.style.transform = `translateX(-${carouselState[carouselId] * 100}%)`;
+function moveSlide(cId, dir, total) {
+    if (carouselState[cId] === undefined) carouselState[cId] = 0;
+    carouselState[cId] = (carouselState[cId] + dir + total) % total;
+    const slides = document.querySelector(`#${cId} .carousel-slides`);
+    slides.style.transform = `translateX(-${carouselState[cId] * 100}%)`;
 }
 
-// Cargar página Sobre Mi
+// Cargar Datos de "Sobre Mi"
 async function loadAboutMe(sheetName) {
     const container = document.getElementById('content');
-    container.innerHTML = '<div class="loader">Cargando perfil... 🌊</div>';
-
     try {
         const response = await fetch(getCsvUrl(sheetName));
         const csvText = await response.text();
-
         Papa.parse(csvText, {
             header: true,
-            skipEmptyLines: true,
             complete: function(results) {
                 if (results.data.length > 0) {
-                    const data = results.data[0]; // Coger la primera línea
-                    const photo = data['Photo'] || data['Foto'] || '';
-                    const name = data['Name'] || data['Nombre'] || 'Mi Nombre';
-                    const bio = data['Bio'] || data['Descripcion'] || '';
-
+                    const d = results.data[0];
+                    const photo = fixImageUrl(d['Photo'] || d['Foto']);
                     container.innerHTML = `
                         <div class="about-card">
-                            ${photo ? `<img src="${photo}" class="about-photo" alt="${name}">` : ''}
-                            <h2 class="about-name">${name}</h2>
-                            <p class="about-bio">${bio}</p>
-                        </div>
-                    `;
+                            ${photo ? `<img src="${photo}" class="about-photo">` : ''}
+                            <h2 class="about-name">${d['Name'] || d['Nombre'] || 'Mi Perfil'}</h2>
+                            <p class="about-bio">${d['Bio'] || d['Descripcion'] || ''}</p>
+                        </div>`;
                 }
             }
         });
-    } catch (error) {
-        container.innerHTML = `<p style="color:red;">Error cargando Sobre Mi.</p>`;
+    } catch (e) {
+        container.innerHTML = '<p>Error al cargar el perfil.</p>';
     }
 }
